@@ -1,8 +1,8 @@
 import collections
 
-import gym
+import gymnasium as gym
 import numpy as np
-from gym.spaces import Box
+from gymnasium.spaces import Box
 
 
 # From https://github.com/openai/baselines/blob/master/baselines/common/atari_wrappers.py#L229
@@ -38,14 +38,14 @@ class FrameStack(gym.Wrapper):
                                      high=high,
                                      dtype=self.observation_space.dtype)
 
-    def reset(self):
+    def reset(self, *args, **kwargs):
         obs = self.env.reset()
         for _ in range(self._num_stack):
             self._frames.append(obs)
-        return self._get_obs()
+        return self._get_obs(), {}
 
     def step(self, action):
-        obs, reward, done, info = self.env.step(action)
+        obs, reward, done, truncate, info = self.env.step(action)
         self._frames.append(obs)
         return self._get_obs(), reward, done, info
 

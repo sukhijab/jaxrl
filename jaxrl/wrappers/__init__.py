@@ -7,3 +7,4 @@ from jaxrl.wrappers.rgb2gray import RGB2Gray
 from jaxrl.wrappers.single_precision import SinglePrecision
 from jaxrl.wrappers.sticky_actions import StickyActionEnv
 from jaxrl.wrappers.take_key import TakeKey
+from jaxrl.wrappers.action_cost import ActionCost

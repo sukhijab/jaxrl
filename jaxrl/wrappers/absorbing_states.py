@@ -1,6 +1,7 @@
-import gym
+import gymnasium
 import numpy as np
-from gym import Wrapper
+from gymnasium import Wrapper
+import gymnasium as gym
 
 
 def make_non_absorbing(observation):
@@ -23,17 +24,19 @@ class AbsorbingStatesWrapper(Wrapper):
     def reset(self, **kwargs):
         self._done = False
         self._absorbing = False
-        self._info = {}
-        return make_non_absorbing(self.env.reset(**kwargs))
+        obs, info = self.env.reset(**kwargs)
+        self._info = info
+        return make_non_absorbing(obs), info
 
     def step(self, action):
         if not self._done:
-            observation, reward, done, info = self.env.step(action)
+            observation, reward, done, truncate, info = self.env.step(action)
             observation = make_non_absorbing(observation)
             self._done = done
             self._info = info
-            truncated_done = 'TimeLimit.truncated' in info
-            return observation, reward, truncated_done, info
+            if 'TimeLimit.truncated' in info:
+                truncate = info['TimeLimit.truncated']
+            return observation, reward, done, truncate, info
         else:
             if not self._absorbing:
                 self._absorbing = True
@@ -43,12 +46,12 @@ class AbsorbingStatesWrapper(Wrapper):
 
 
 if __name__ == '__main__':
-    env = gym.make('Hopper-v2')
+    env = gymnasium.make('Hopper-v4')
     env = AbsorbingStatesWrapper(env)
     env.reset()
 
     done = False
     while not done:
         action = env.action_space.sample()
-        obs, reward, done, info = env.step(action)
+        obs, reward, done, truncate, info = env.step(action)
         print(obs, done)

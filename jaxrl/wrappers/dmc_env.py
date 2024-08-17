@@ -8,7 +8,8 @@ from typing import Dict, Optional, OrderedDict
 import dm_env
 import numpy as np
 from dm_control import suite
-from gym import core, spaces
+from gymnasium import core, spaces
+
 
 from jaxrl.wrappers.common import TimeStep
 
@@ -69,18 +70,22 @@ class DMCEnv(core.Env):
 
         time_step = self._env.step(action)
         reward = time_step.reward or 0
-        done = time_step.last()
         obs = time_step.observation
 
+        termination = False  # we never reach a goal
+        truncation = time_step.last()
+        info = {"discount": time_step.discount}
+        return obs, reward, termination, truncation, info
+
+    def reset(self, seed=None, options=None):
+        if seed is not None:
+            if not isinstance(seed, np.random.RandomState):
+                seed = np.random.RandomState(seed)
+            self._env.task._random = seed
+        timestep = self._env.reset()
+        observation = timestep.observation
         info = {}
-        if done and time_step.discount == 1.0:
-            info['TimeLimit.truncated'] = True
-
-        return obs, reward, done, info
-
-    def reset(self):
-        time_step = self._env.reset()
-        return time_step.observation
+        return observation, info
 
     def render(self,
                mode='rgb_array',

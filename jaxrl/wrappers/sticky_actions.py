@@ -3,7 +3,7 @@ Take from
 https://github.com/openai/atari-reset/blob/master/atari_reset/wrappers.py
 """
 
-import gym
+import gymnasium as gym
 import numpy as np
 
 
@@ -18,5 +18,5 @@ class StickyActionEnv(gym.Wrapper):
         if np.random.uniform() < self.p:
             action = self.last_action
         self.last_action = action
-        obs, reward, done, info = self.env.step(action)
-        return obs, reward, done, info
+        obs, reward, done, truncate, info = self.env.step(action)
+        return obs, reward, done, truncate, info

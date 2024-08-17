@@ -1,6 +1,6 @@
 from typing import Optional, Union
 
-import gym
+import gymnasium as gym
 import numpy as np
 
 from jaxrl.datasets.dataset import Dataset

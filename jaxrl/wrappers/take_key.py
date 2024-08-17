@@ -1,6 +1,6 @@
 import copy
 
-import gym
+import gymnasium as gym
 
 
 class TakeKey(gym.ObservationWrapper):

@@ -1,6 +1,6 @@
 import time
 
-import gym
+import gymnasium as gym
 import numpy as np
 
 from jaxrl.wrappers.common import TimeStep
@@ -20,7 +20,7 @@ class EpisodeMonitor(gym.ActionWrapper):
         self.start_time = time.time()
 
     def step(self, action: np.ndarray) -> TimeStep:
-        observation, reward, done, info = self.env.step(action)
+        observation, reward, done, truncate, info = self.env.step(action)
 
         self.reward_sum += reward
         self.episode_length += 1
@@ -37,8 +37,8 @@ class EpisodeMonitor(gym.ActionWrapper):
                 info['episode']['return'] = self.get_normalized_score(
                     info['episode']['return']) * 100.0
 
-        return observation, reward, done, info
+        return observation, reward, done, truncate, info
 
-    def reset(self, **kwargs) -> np.ndarray:
+    def reset(self, **kwargs):
         self._reset_stats()
         return self.env.reset()
