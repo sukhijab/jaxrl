@@ -27,7 +27,7 @@ class EpisodeMonitor(gym.ActionWrapper):
         self.total_timesteps += 1
         info['total'] = {'timesteps': self.total_timesteps}
 
-        if done:
+        if done or truncate:
             info['episode'] = {}
             info['episode']['return'] = self.reward_sum
             info['episode']['length'] = self.episode_length

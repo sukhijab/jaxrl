@@ -8,9 +8,9 @@ from jaxrl.networks.common import InfoDict, Model, Params, PRNGKey
 
 
 def target_update(critic: Model, target_critic: Model, tau: float) -> Model:
-    new_target_params = jax.tree_multimap(
-        lambda p, tp: p * tau + tp * (1 - tau), critic.params,
-        target_critic.params)
+    new_target_params = jax.tree_util.tree_map(
+        lambda x, y: x * (1 - tau) + y * tau, target_critic.params,
+        critic.params)
 
     return target_critic.replace(params=new_target_params)
 

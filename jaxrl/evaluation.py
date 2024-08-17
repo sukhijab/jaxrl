@@ -1,7 +1,6 @@
 from typing import Dict
 
-import flax.linen as nn
-import gym
+import gymnasium as gym
 import numpy as np
 
 
@@ -9,12 +8,15 @@ def evaluate(agent, env: gym.Env, num_episodes: int) -> Dict[str, float]:
     stats = {'return': [], 'length': []}
     successes = None
     for _ in range(num_episodes):
-        observation, done = env.reset(), False
-        while not done:
+        observation, _ = env.reset()
+        finish = False
+        while not finish:
             action = agent.sample_actions(observation, temperature=0.0)
-            observation, _, done, info = env.step(action)
-        for k in stats.keys():
-            stats[k].append(info['episode'][k])
+            observation, _, done, truncate, info = env.step(action)
+            finish = done or truncate
+        if 'episode' in info:
+            for k in stats.keys():
+                stats[k].append(info['episode'][k])
 
         if 'is_success' in info:
             if successes is None:

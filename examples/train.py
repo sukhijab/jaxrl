@@ -8,7 +8,7 @@ from absl import app, flags
 from ml_collections import config_flags
 from tensorboardX import SummaryWriter
 
-from jaxrl.agents import (AWACLearner, DDPGLearner, REDQLearner, SACLearner,
+from jaxrl.agents import (DDPGLearner, REDQLearner, SACLearner,
                           SACV1Learner)
 from jaxrl.datasets import ReplayBuffer
 from jaxrl.evaluation import evaluate
@@ -16,7 +16,7 @@ from jaxrl.utils import make_env
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string('env_name', 'HalfCheetah-v2', 'Environment name.')
+flags.DEFINE_string('env_name', 'HalfCheetah-v4', 'Environment name.')
 flags.DEFINE_string('save_dir', './tmp/', 'Tensorboard logging dir.')
 flags.DEFINE_integer('seed', 42, 'Random seed.')
 flags.DEFINE_integer('eval_episodes', 10,
@@ -30,9 +30,9 @@ flags.DEFINE_integer('start_training', int(1e4),
                      'Number of training steps to start training.')
 flags.DEFINE_boolean('tqdm', True, 'Use tqdm progress bar.')
 flags.DEFINE_boolean('save_video', False, 'Save videos during evaluation.')
-flags.DEFINE_boolean('track', False, 'Track experiments with Weights and Biases.')
+flags.DEFINE_boolean('track', True, 'Track experiments with Weights and Biases.')
 flags.DEFINE_string('wandb_project_name', "jaxrl", "The wandb's project name.")
-flags.DEFINE_string('wandb_entity', None, "the entity (team) of wandb's project")
+flags.DEFINE_string('wandb_entity', 'sukhijab', "the entity (team) of wandb's project")
 config_flags.DEFINE_config_file(
     'config',
     'configs/sac_default.py',
@@ -78,8 +78,8 @@ def main(_):
     replay_buffer_size = kwargs.pop('replay_buffer_size')
     if algo == 'sac':
         agent = SACLearner(FLAGS.seed,
-                           env.observation_space.sample()[np.newaxis],
-                           env.action_space.sample()[np.newaxis], **kwargs)
+                           env.observation_space.sample(),
+                           env.action_space.sample(), **kwargs)
     elif algo == 'redq':
         agent = REDQLearner(FLAGS.seed,
                             env.observation_space.sample()[np.newaxis],
@@ -90,10 +90,6 @@ def main(_):
         agent = SACV1Learner(FLAGS.seed,
                              env.observation_space.sample()[np.newaxis],
                              env.action_space.sample()[np.newaxis], **kwargs)
-    elif algo == 'awac':
-        agent = AWACLearner(FLAGS.seed,
-                            env.observation_space.sample()[np.newaxis],
-                            env.action_space.sample()[np.newaxis], **kwargs)
     elif algo == 'ddpg':
         agent = DDPGLearner(FLAGS.seed,
                             env.observation_space.sample()[np.newaxis],
@@ -105,7 +101,7 @@ def main(_):
                                  replay_buffer_size or FLAGS.max_steps)
 
     eval_returns = []
-    observation, done = env.reset(), False
+    observation, _ = env.reset()
     for i in tqdm.tqdm(range(1, FLAGS.max_steps + 1),
                        smoothing=0.1,
                        disable=not FLAGS.tqdm):
@@ -113,9 +109,9 @@ def main(_):
             action = env.action_space.sample()
         else:
             action = agent.sample_actions(observation)
-        next_observation, reward, done, info = env.step(action)
+        next_observation, reward, done, truncate, info = env.step(action)
 
-        if not done or 'TimeLimit.truncated' in info:
+        if not done or truncate:
             mask = 1.0
         else:
             mask = 0.0
@@ -124,8 +120,10 @@ def main(_):
                              next_observation)
         observation = next_observation
 
-        if done:
-            observation, done = env.reset(), False
+        if done or truncate:
+            observation, _ = env.reset()
+            done = False
+            truncate = False
             for k, v in info['episode'].items():
                 summary_writer.add_scalar(f'training/{k}', v,
                                           info['total']['timesteps'])

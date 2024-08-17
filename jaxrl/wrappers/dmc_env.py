@@ -41,7 +41,11 @@ class DMCEnv(core.Env):
                  task_name: Optional[str] = None,
                  env: Optional[dm_env.Environment] = None,
                  task_kwargs: Optional[Dict] = {},
-                 environment_kwargs=None):
+                 environment_kwargs=None,
+                 height: int = 84,
+                 width: int = 84,
+                 camera_id: int = 0,
+                 ):
         assert 'random' in task_kwargs, 'Please specify a seed, for deterministic behaviour.'
         assert (
             env is not None
@@ -61,6 +65,10 @@ class DMCEnv(core.Env):
             self._env.observation_spec())
 
         self.seed(seed=task_kwargs['random'])
+        self.render_mode = 'rgb_array'
+        self.height = height
+        self.width = width
+        self.camera_id = camera_id
 
     def __getattr__(self, name):
         return getattr(self._env, name)
@@ -78,21 +86,19 @@ class DMCEnv(core.Env):
         return obs, reward, termination, truncation, info
 
     def reset(self, seed=None, options=None):
-        if seed is not None:
-            if not isinstance(seed, np.random.RandomState):
-                seed = np.random.RandomState(seed)
-            self._env.task._random = seed
+        self.seed(seed)
         timestep = self._env.reset()
         observation = timestep.observation
         info = {}
         return observation, info
 
-    def render(self,
-               mode='rgb_array',
-               height: int = 84,
-               width: int = 84,
-               camera_id: int = 0):
-        assert mode == 'rgb_array', 'only support rgb_array mode, given %s' % mode
-        return self._env.physics.render(height=height,
-                                        width=width,
-                                        camera_id=camera_id)
+    def seed(self, seed):
+        if seed is not None:
+            if not isinstance(seed, np.random.RandomState):
+                seed = np.random.RandomState(seed)
+            self._env.task._random = seed
+
+    def render(self):
+        return self._env.physics.render(height=self.height,
+                                        width=self.width,
+                                        camera_id=self.camera_id)

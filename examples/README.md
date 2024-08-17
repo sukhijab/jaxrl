@@ -27,15 +27,6 @@ MUJOCO_GL=egl python train_pixels.py --env_name=cheetah-run --save_dir=./tmp/
 
 For offline RL
 
-```bash
-python train_offline.py --env_name=halfcheetah-expert-v0  --dataset_name=d4rl --save_dir=./tmp/
-```
-
-For RL finetuning
-
-```bash
-python train_finetuning.py --env_name=HalfCheetah-v2 --dataset_name=awac --save_dir=./tmp/
-```
 
 For sample efficient RL
 

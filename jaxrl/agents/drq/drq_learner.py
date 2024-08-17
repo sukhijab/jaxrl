@@ -49,8 +49,8 @@ def _update_jit(
         new_target_critic = target_critic
 
     # Use critic conv layers in actor:
-    new_actor_params = actor.params.copy(
-        add_or_replace={'SharedEncoder': new_critic.params['SharedEncoder']})
+    new_actor_params = actor.params.copy()
+    new_actor_params.update({'SharedEncoder': new_critic.params['SharedEncoder']})
     actor = actor.replace(params=new_actor_params)
 
     rng, key = jax.random.split(rng)

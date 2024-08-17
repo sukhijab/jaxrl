@@ -39,15 +39,15 @@ class FrameStack(gym.Wrapper):
                                      dtype=self.observation_space.dtype)
 
     def reset(self, *args, **kwargs):
-        obs = self.env.reset()
+        obs, info = self.env.reset()
         for _ in range(self._num_stack):
             self._frames.append(obs)
-        return self._get_obs(), {}
+        return self._get_obs(), info
 
     def step(self, action):
         obs, reward, done, truncate, info = self.env.step(action)
         self._frames.append(obs)
-        return self._get_obs(), reward, done, info
+        return self._get_obs(), reward, done, truncate, info
 
     def _get_obs(self):
         assert len(self._frames) == self._num_stack

@@ -20,7 +20,7 @@ class RepeatAction(gym.Wrapper):
             obs, reward, done, truncate, info = self.env.step(action)
             total_reward += reward
             combined_info.update(info)
-            if done:
+            if done or truncate:
                 break
 
         return obs, total_reward, done, truncate, combined_info

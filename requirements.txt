@@ -47,3 +47,4 @@ tomli
 toolz
 tqdm
 wandb
+tensorboard

@@ -85,15 +85,16 @@ def main(_):
     kwargs.pop('algo')
     replay_buffer_size = kwargs.pop('replay_buffer_size')
     agent = DrQLearner(FLAGS.seed,
-                       env.observation_space.sample()[np.newaxis],
-                       env.action_space.sample()[np.newaxis], **kwargs)
+                       env.observation_space.sample(),
+                       env.action_space.sample(), **kwargs)
 
     replay_buffer = ReplayBuffer(
         env.observation_space, env.action_space, replay_buffer_size
         or FLAGS.max_steps // action_repeat)
 
     eval_returns = []
-    observation, done = env.reset(), False
+    observation, _ = env.reset()
+    done = False
     for i in tqdm.tqdm(range(1, FLAGS.max_steps // action_repeat + 1),
                        smoothing=0.1,
                        disable=not FLAGS.tqdm):
@@ -101,9 +102,9 @@ def main(_):
             action = env.action_space.sample()
         else:
             action = agent.sample_actions(observation)
-        next_observation, reward, done, info = env.step(action)
+        next_observation, reward, done, truncate, info = env.step(action)
 
-        if not done or 'TimeLimit.truncated' in info:
+        if not done or truncate:
             mask = 1.0
         else:
             mask = 0.0
@@ -112,8 +113,10 @@ def main(_):
                              next_observation)
         observation = next_observation
 
-        if done:
-            observation, done = env.reset(), False
+        if done or truncate:
+            observation, _ = env.reset()
+            done = False
+            truncate = False
             for k, v in info['episode'].items():
                 summary_writer.add_scalar(f'training/{k}', v,
                                           info['total']['timesteps'])

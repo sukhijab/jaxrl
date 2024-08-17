@@ -1,5 +1,3 @@
-from jaxrl.agents.awac.awac_learner import AWACLearner
-from jaxrl.agents.bc.bc_learner import BCLearner
 from jaxrl.agents.ddpg.ddpg_learner import DDPGLearner
 from jaxrl.agents.drq.drq_learner import DrQLearner
 from jaxrl.agents.redq.redq_learner import REDQLearner
