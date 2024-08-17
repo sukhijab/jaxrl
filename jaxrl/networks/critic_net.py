@@ -1,6 +1,6 @@
 """Implementations of algorithms for continuous control."""
 
-from typing import Callable, Sequence, Tuple
+from typing import Callable, Sequence
 
 import jax.numpy as jnp
 from flax import linen as nn
