@@ -21,12 +21,12 @@ from jaxrl.networks.common import InfoDict, Model, PRNGKey
 
 @functools.partial(jax.jit,
                    static_argnames=('backup_entropy', 'n', 'm',
-                                    'update_target', 'update_policy'))
+                                    'update_target', 'update_policy', 'use_log_transform'))
 def _update_jit(
     rng: PRNGKey, actor: Model, critic: Model, target_critic: Model,
     temp: Model, batch: Batch, discount: float, tau: float,
     target_entropy: float, backup_entropy: bool, n: int, m: int,
-    update_target: bool, update_policy: bool
+    update_target: bool, update_policy: bool, use_log_transform: bool
 ) -> Tuple[PRNGKey, Model, Model, Model, Model, InfoDict]:
 
     rng, key = jax.random.split(rng)
@@ -50,7 +50,7 @@ def _update_jit(
         new_actor, actor_info = update_actor(key, actor, new_critic, temp,
                                              batch)
         new_temp, alpha_info = temperature.update(temp, actor_info['entropy'],
-                                                  target_entropy)
+                                                  target_entropy, use_log_transform=use_log_transform)
     else:
         new_actor, actor_info = actor, {}
         new_temp, alpha_info = temp, {}
@@ -83,10 +83,12 @@ class REDQLearner(object):
             backup_entropy: bool = True,
             init_temperature: float = 1.0,
             init_mean: Optional[np.ndarray] = None,
+            use_log_transform: bool = True,
             policy_final_fc_init_scale: float = 1.0):
         """
         An implementation of the version of Soft-Actor-Critic described in https://arxiv.org/abs/1812.05905
         """
+        self.use_log_transform = use_log_transform
 
         action_dim = actions.shape[-1]
 
@@ -136,7 +138,7 @@ class REDQLearner(object):
 
     def sample_actions(self,
                        observations: np.ndarray,
-                       temperature: float = 1.0) -> jnp.ndarray:
+                       temperature: float = 1.0) -> np.ndarray:
         rng, actions = policies.sample_actions(self.rng, self.actor.apply_fn,
                                                self.actor.params, observations,
                                                temperature)
@@ -162,7 +164,8 @@ class REDQLearner(object):
             self.n,
             self.m,
             update_target=self.step % self.target_update_period == 0,
-            update_policy=self.step % self.policy_update_delay == 0)
+            update_policy=self.step % self.policy_update_delay == 0,
+            use_log_transform=self.use_log_transform)
 
         self.rng = new_rng
         self.actor = new_actor

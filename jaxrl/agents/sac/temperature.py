@@ -18,13 +18,18 @@ class Temperature(nn.Module):
 
 
 def update(temp: Model, entropy: float,
-           target_entropy: float) -> Tuple[Model, InfoDict]:
+           target_entropy: float, use_log_transform: bool = True) -> Tuple[Model, InfoDict]:
 
     def temperature_loss_fn(temp_params):
         temperature = temp.apply_fn({'params': temp_params})
-        temp_loss = temperature * (entropy - target_entropy).mean()
+        if use_log_transform:
+            log_temp = jnp.log(temperature)
+            temp_loss = log_temp * (entropy - target_entropy).mean()
+        else:
+            temp_loss = temperature * (entropy - target_entropy).mean()
         return temp_loss, {'temperature': temperature, 'temp_loss': temp_loss}
 
     new_temp, info = temp.apply_gradient(temperature_loss_fn)
 
     return new_temp, info
+

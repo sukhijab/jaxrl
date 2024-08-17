@@ -40,7 +40,7 @@ pycparser
 pyopengl
 pyyaml
 setuptools-scm
-tensorboardx==2.5
+tensorboardx
 tensorflow-probability
 termcolor==1.1.0
 tomli
