@@ -12,6 +12,7 @@ def make_env(env_name: str,
              save_folder: Optional[str] = None,
              add_episode_monitor: bool = True,
              action_repeat: int = 1,
+             action_cost: float = 0.0,
              frame_stack: int = 1,
              from_pixels: bool = False,
              pixels_only: bool = True,
@@ -55,6 +56,7 @@ def make_env(env_name: str,
     if action_repeat > 1:
         env = wrappers.RepeatAction(env, action_repeat)
 
+    env = wrappers.ActionCost(env, action_cost=action_cost)
     env = RescaleAction(env, -1.0, 1.0)
 
     if save_folder is not None:
