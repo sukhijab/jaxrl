@@ -111,7 +111,7 @@ def main(_):
             action = agent.sample_actions(observation)
         next_observation, reward, done, truncate, info = env.step(action)
 
-        if not done or truncate:
+        if done:
             mask = 1.0
         else:
             mask = 0.0

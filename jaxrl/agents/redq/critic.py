@@ -35,7 +35,8 @@ def update(rng: PRNGKey, actor: Model, critic: Model, target_critic: Model,
     target_q = batch.rewards + discount * batch.masks * next_q
 
     if backup_entropy:
-        target_q -= discount * batch.masks * temp() * next_log_probs
+        ent_coef, _ = temp()
+        target_q -= discount * batch.masks * ent_coef * next_log_probs
 
     def critic_loss_fn(critic_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
         qs = critic.apply_fn({'params': critic_params}, batch.observations,

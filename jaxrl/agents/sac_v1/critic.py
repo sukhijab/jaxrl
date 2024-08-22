@@ -16,7 +16,8 @@ def update_v(key: PRNGKey, actor: Model, critic: Model, value: Model,
     target_v = jnp.minimum(q1, q2)
 
     if soft_critic:
-        target_v -= temp() * log_probs
+        ent_coef, _ = temp()
+        target_v -= ent_coef * log_probs
 
     def value_loss_fn(value_params: Params) -> Tuple[jnp.ndarray, InfoDict]:
         v = value.apply_fn({'params': value_params}, batch.observations)

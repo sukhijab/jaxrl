@@ -19,11 +19,11 @@ from jaxrl.networks import policies
 from jaxrl.networks.common import InfoDict, Model, PRNGKey
 
 
-@functools.partial(jax.jit, static_argnames=('update_target'))
+@functools.partial(jax.jit, static_argnames=('update_target', 'use_log_transform'))
 def _update_jit(
     rng: PRNGKey, actor: Model, critic: Model, target_critic: Model,
     temp: Model, batch: Batch, discount: float, tau: float,
-    target_entropy: float, update_target: bool
+    target_entropy: float, update_target: bool, use_log_transform: bool,
 ) -> Tuple[PRNGKey, Model, Model, Model, Model, InfoDict]:
 
     rng, key = jax.random.split(rng)
@@ -56,7 +56,7 @@ def _update_jit(
     rng, key = jax.random.split(rng)
     new_actor, actor_info = update_actor(key, actor, new_critic, temp, batch)
     new_temp, alpha_info = temperature.update(temp, actor_info['entropy'],
-                                              target_entropy)
+                                              target_entropy, use_log_transform=use_log_transform)
 
     return rng, new_actor, new_critic, new_target_critic, new_temp, {
         **critic_info,
@@ -83,7 +83,8 @@ class DrQLearner(object):
                  tau: float = 0.005,
                  target_update_period: int = 1,
                  target_entropy: Optional[float] = None,
-                 init_temperature: float = 0.1):
+                 init_temperature: float = 0.1,
+                 use_log_transform: bool = True):
 
         action_dim = actions.shape[-1]
 
@@ -123,10 +124,11 @@ class DrQLearner(object):
         self.temp = temp
         self.rng = rng
         self.step = 0
+        self.use_log_transform = use_log_transform
 
     def sample_actions(self,
                        observations: np.ndarray,
-                       temperature: float = 1.0) -> jnp.ndarray:
+                       temperature: float = 1.0) -> np.ndarray:
         rng, actions = policies.sample_actions(self.rng, self.actor.apply_fn,
                                                self.actor.params, observations,
                                                temperature)
@@ -141,7 +143,7 @@ class DrQLearner(object):
         new_rng, new_actor, new_critic, new_target_critic, new_temp, info = _update_jit(
             self.rng, self.actor, self.critic, self.target_critic, self.temp,
             batch, self.discount, self.tau, self.target_entropy,
-            self.step % self.target_update_period == 0)
+            self.step % self.target_update_period == 0, use_log_transform=self.use_log_transform)
 
         self.rng = new_rng
         self.actor = new_actor
