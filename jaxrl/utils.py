@@ -50,13 +50,14 @@ def make_env(env_name: str,
     if flatten and isinstance(env.observation_space, gym.spaces.Dict):
         env = gym.wrappers.FlattenObservation(env)
 
+    env = wrappers.ActionCost(env, action_cost=action_cost)
+
     if add_episode_monitor:
         env = wrappers.EpisodeMonitor(env)
 
     if action_repeat > 1:
         env = wrappers.RepeatAction(env, action_repeat)
 
-    env = wrappers.ActionCost(env, action_cost=action_cost)
     env = RescaleAction(env, -1.0, 1.0)
 
     if save_folder is not None:
