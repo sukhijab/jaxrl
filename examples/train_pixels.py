@@ -94,7 +94,7 @@ def main(_):
 
     eval_returns = []
     observation, _ = env.reset()
-    done = False
+    terminate = False
     for i in tqdm.tqdm(range(1, FLAGS.max_steps // action_repeat + 1),
                        smoothing=0.1,
                        disable=not FLAGS.tqdm):
@@ -102,20 +102,20 @@ def main(_):
             action = env.action_space.sample()
         else:
             action = agent.sample_actions(observation)
-        next_observation, reward, done, truncate, info = env.step(action)
+        next_observation, reward, terminate, truncate, info = env.step(action)
 
-        if not done or truncate:
-            mask = 1.0
-        else:
+        if terminate:
             mask = 0.0
+        else:
+            mask = 1.0
 
-        replay_buffer.insert(observation, action, reward, mask, float(done),
+        replay_buffer.insert(observation, action, reward, mask, float(terminate or truncate),
                              next_observation)
         observation = next_observation
 
-        if done or truncate:
+        if terminate or truncate:
             observation, _ = env.reset()
-            done = False
+            terminate = False
             truncate = False
             for k, v in info['episode'].items():
                 summary_writer.add_scalar(f'training/{k}', v,
