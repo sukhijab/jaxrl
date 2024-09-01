@@ -12,20 +12,28 @@ from jaxrl.agents.drq.augmentations import batched_random_crop
 from jaxrl.agents.drq.networks import DrQDoubleCritic, DrQPolicy
 from jaxrl.agents.sac import temperature
 from jaxrl.agents.sac.actor import update as update_actor
-from jaxrl.agents.sac.critic import target_update
+# from jaxrl.agents.sac.critic import target_update
 from jaxrl.agents.sac.critic import update as update_critic
 from jaxrl.datasets import Batch
 from jaxrl.networks import policies
 from jaxrl.networks.common import InfoDict, Model, PRNGKey
 
 
+def target_update(critic: Model, target_critic: Model, tau: float) -> Model:
+    new_target_params = jax.tree_util.tree_map(
+        lambda x, y: x * (1 - tau) + y * tau, target_critic.params,
+        critic.params)
+    # copy over the encoder params for the target --> they all share the same encoder
+    new_target_params.update({'SharedEncoder': critic.params['SharedEncoder']})
+    return target_critic.replace(params=new_target_params)
+
+
 @functools.partial(jax.jit, static_argnames=('update_target', 'use_log_transform'))
 def _update_jit(
-    rng: PRNGKey, actor: Model, critic: Model, target_critic: Model,
-    temp: Model, batch: Batch, discount: float, tau: float,
-    target_entropy: float, update_target: bool, use_log_transform: bool,
+        rng: PRNGKey, actor: Model, critic: Model, target_critic: Model,
+        temp: Model, batch: Batch, discount: float, tau: float,
+        target_entropy: float, update_target: bool, use_log_transform: bool,
 ) -> Tuple[PRNGKey, Model, Model, Model, Model, InfoDict]:
-
     rng, key = jax.random.split(rng)
     observations = batched_random_crop(key, batch.observations)
     rng, key = jax.random.split(rng)
