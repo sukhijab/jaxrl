@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import jax.lax
 import jax.numpy as jnp
 from flax import linen as nn
 
@@ -17,7 +18,11 @@ class Temperature(nn.Module):
                               init_fn=lambda key: jnp.full(
                                   (), jnp.log(self.initial_temperature)))
         # clip log temp to avoid too large or small values
-        log_temp = jnp.clip(log_temp, min=jnp.log(self.min_temp), max=jnp.log(self.max_temp))
+        clamped_log_temp = jax.lax.stop_gradient(jnp.clip(log_temp,
+                                                          min=jnp.log(self.min_temp), max=jnp.log(self.max_temp)))
+        # clips gradient but maintains derivative
+        log_temp = log_temp - jax.lax.stop_gradient(log_temp) + clamped_log_temp
+        # log_temp = jnp.clip(log_temp, min=jnp.log(self.min_temp), max=jnp.log(self.max_temp))
         return jnp.exp(log_temp), log_temp
 
 
