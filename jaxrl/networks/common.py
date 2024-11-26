@@ -38,6 +38,58 @@ class MLP(nn.Module):
         return x
 
 
+class BroNetBlock(nn.Module):
+    hidden_dim: int
+    activations: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
+    use_layer_norm: bool = True
+    dropout_rate: Optional[float] = None
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray, training: bool = False) -> jnp.ndarray:
+        assert x.shape[-1] == self.hidden_dim
+        out = nn.Dense(self.hidden_dim, kernel_init=default_init())(x)
+        if self.dropout_rate is not None:
+            out = nn.Dropout(rate=self.dropout_rate)(
+                out, deterministic=not training)
+        out = nn.LayerNorm()(out)
+        out = self.activations(out)
+        out = nn.Dense(self.hidden_dim, kernel_init=default_init())(out)
+        if self.dropout_rate is not None:
+            out = nn.Dropout(rate=self.dropout_rate)(
+                out, deterministic=not training)
+        out = nn.LayerNorm()(out)
+        return out + x
+
+
+class BroNet(nn.Module):
+    hidden_dims: Sequence[int]
+    activations: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
+    activate_final: int = False
+    dropout_rate: Optional[float] = None
+    use_layer_norm: bool = True
+
+    @nn.compact
+    def __call__(self, x: jnp.ndarray, training: bool = False) -> jnp.ndarray:
+        for i, size in enumerate(self.hidden_dims):
+            # if the first or final layer
+            if i == 0 or i == len(self.hidden_dims) - 1:
+                x = nn.Dense(size, kernel_init=default_init())(x)
+                if i + 1 < len(self.hidden_dims) or self.activate_final:
+                    if i + 1 < len(self.hidden_dims):
+                        if self.use_layer_norm:
+                            x = nn.LayerNorm()(x)
+                    x = self.activations(x)
+                    if self.dropout_rate is not None:
+                        x = nn.Dropout(rate=self.dropout_rate)(
+                            x, deterministic=not training)
+            else:
+                x = BroNetBlock(hidden_dim=size,
+                                activations=self.activations,
+                                use_layer_norm=self.use_layer_norm,
+                                dropout_rate=self.dropout_rate)(x, training=training)
+        return x
+
+
 # TODO: Replace with TrainState when it's ready
 # https://github.com/google/flax/blob/master/docs/flip/1009-optimizer-api.md#train-state
 @flax.struct.dataclass

@@ -1,7 +1,7 @@
 """Implementations of algorithms for continuous control."""
 
 import functools
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, List
 
 import jax
 import jax.numpy as jnp
@@ -69,7 +69,11 @@ class SACLearner(object):
                  init_temperature: float = 1.0,
                  init_mean: Optional[np.ndarray] = None,
                  use_log_transform: bool = True,
-                 policy_final_fc_init_scale: float = 1.0):
+                 policy_final_fc_init_scale: float = 1.0,
+                 use_bronet: bool = False,
+                 reset_period: Optional[int] = None,
+                 reset_models: bool = False,
+                 ):
         """
         An implementation of the version of Soft-Actor-Critic described in https://arxiv.org/abs/1812.05905
         """
@@ -87,6 +91,26 @@ class SACLearner(object):
         self.target_update_period = target_update_period
         self.discount = discount
 
+        if reset_period is None:
+            self.reset_period = 250_000
+        else:
+            self.reset_period = reset_period
+
+        self._reset_models = reset_models
+        self.use_bronet = use_bronet
+
+        # kwargs saved for resetting
+        self.hidden_dims = hidden_dims
+        self.dummy_obs = observations
+        self.dummy_acts = actions
+        self.policy_final_fc_init_scale = policy_final_fc_init_scale
+        self.init_mean = init_mean
+        self.init_temperature = init_temperature
+        self.actor_lr = actor_lr
+        self.critic_lr = critic_lr
+        self.temp_lr = temp_lr
+
+
         rng = jax.random.PRNGKey(seed)
         rng, actor_key, critic_key, temp_key = jax.random.split(rng, 4)
         actor_def = policies.NormalTanhPolicy(
@@ -98,7 +122,7 @@ class SACLearner(object):
                              inputs=[actor_key, observations],
                              tx=optax.adam(learning_rate=actor_lr))
 
-        critic_def = critic_net.DoubleCritic(hidden_dims)
+        critic_def = critic_net.DoubleCritic(hidden_dims, use_bronet=use_bronet)
         critic = Model.create(critic_def,
                               inputs=[critic_key, observations, actions],
                               tx=optax.adam(learning_rate=critic_lr))
@@ -129,8 +153,12 @@ class SACLearner(object):
         return np.clip(actions, -1, 1)
 
     def update(self, batch: Batch) -> InfoDict:
-        self.step += 1
+        if self._reset_models:
+            if self.step % self.reset_period == 1 and self.step > 1:
+                rng, self.rng = jax.random.split(self.rng)
+                self.reset_models(rng=rng)
 
+        self.step += 1
         new_rng, new_actor, new_critic, new_target_critic, new_temp, info = _update_jit(
             self.rng, self.actor, self.critic, self.target_critic, self.temp,
             batch, self.discount, self.tau, self.target_entropy,
@@ -144,3 +172,32 @@ class SACLearner(object):
         self.temp = new_temp
 
         return info
+
+    def reset_models(self, rng: PRNGKey):
+        print(f'resetting model at step: {self.step}')
+        actor_key, critic_key, temp_key = jax.random.split(rng, 3)
+        action_dim = self.dummy_acts.shape[-1]
+        actor_def = policies.NormalTanhPolicy(
+            self.hidden_dims,
+            action_dim,
+            init_mean=self.init_mean,
+            final_fc_init_scale=self.policy_final_fc_init_scale)
+        actor = Model.create(actor_def,
+                             inputs=[actor_key, self.dummy_obs],
+                             tx=optax.adam(learning_rate=self.actor_lr))
+
+        critic_def = critic_net.DoubleCritic(self.hidden_dims, use_bronet=self.use_bronet)
+        critic = Model.create(critic_def,
+                              inputs=[critic_key, self.dummy_obs, self.dummy_acts],
+                              tx=optax.adam(learning_rate=self.critic_lr))
+        target_critic = Model.create(
+            critic_def, inputs=[critic_key, self.dummy_obs, self.dummy_acts])
+
+        temp = Model.create(temperature.Temperature(self.init_temperature),
+                            inputs=[temp_key],
+                            tx=optax.adam(learning_rate=self.temp_lr))
+
+        self.actor = actor
+        self.critic = critic
+        self.target_critic = target_critic
+        self.temp = temp
