@@ -73,6 +73,7 @@ class SACLearner(object):
                  use_bronet: bool = False,
                  reset_period: Optional[int] = None,
                  reset_models: bool = False,
+                 max_gradient_norm: Optional[float] = None,
                  ):
         """
         An implementation of the version of Soft-Actor-Critic described in https://arxiv.org/abs/1812.05905
@@ -109,6 +110,7 @@ class SACLearner(object):
         self.actor_lr = actor_lr
         self.critic_lr = critic_lr
         self.temp_lr = temp_lr
+        self.max_gradient_norm = max_gradient_norm
 
 
         rng = jax.random.PRNGKey(seed)
@@ -118,20 +120,38 @@ class SACLearner(object):
             action_dim,
             init_mean=init_mean,
             final_fc_init_scale=policy_final_fc_init_scale)
+        actor_optimizer = optax.adam(learning_rate=actor_lr)
+        critic_optimizer = optax.adam(learning_rate=critic_lr)
+        temp_optimizer = optax.adam(learning_rate=temp_lr)
+        if max_gradient_norm:
+            assert max_gradient_norm > 0
+            actor_optimizer = optax.chain(
+                optax.clip_by_global_norm(max_gradient_norm),  # Apply gradient clipping
+                actor_optimizer  # Apply Adam optimizer
+            )
+            critic_optimizer = optax.chain(
+                optax.clip_by_global_norm(max_gradient_norm),
+                critic_optimizer,
+            )
+
+            temp_optimizer = optax.chain(
+                optax.clip_by_global_norm(max_gradient_norm),
+                temp_optimizer,
+            )
         actor = Model.create(actor_def,
                              inputs=[actor_key, observations],
-                             tx=optax.adam(learning_rate=actor_lr))
+                             tx=actor_optimizer)
 
         critic_def = critic_net.DoubleCritic(hidden_dims, use_bronet=use_bronet)
         critic = Model.create(critic_def,
                               inputs=[critic_key, observations, actions],
-                              tx=optax.adam(learning_rate=critic_lr))
+                              tx=critic_optimizer)
         target_critic = Model.create(
             critic_def, inputs=[critic_key, observations, actions])
 
         temp = Model.create(temperature.Temperature(init_temperature),
                             inputs=[temp_key],
-                            tx=optax.adam(learning_rate=temp_lr))
+                            tx=temp_optimizer)
 
         self.actor = actor
         self.critic = critic
@@ -182,20 +202,39 @@ class SACLearner(object):
             action_dim,
             init_mean=self.init_mean,
             final_fc_init_scale=self.policy_final_fc_init_scale)
+        actor_optimizer = optax.adam(learning_rate=self.actor_lr)
+        critic_optimizer = optax.adam(learning_rate=self.critic_lr)
+        temp_optimizer = optax.adam(learning_rate=self.temp_lr)
+        if self.max_gradient_norm:
+            assert self.max_gradient_norm > 0
+            actor_optimizer = optax.chain(
+                optax.clip_by_global_norm(self.max_gradient_norm),  # Apply gradient clipping
+                actor_optimizer  # Apply Adam optimizer
+            )
+            critic_optimizer = optax.chain(
+                optax.clip_by_global_norm(self.max_gradient_norm),
+                critic_optimizer,
+            )
+
+            temp_optimizer = optax.chain(
+                optax.clip_by_global_norm(self.max_gradient_norm),
+                temp_optimizer,
+            )
+
         actor = Model.create(actor_def,
                              inputs=[actor_key, self.dummy_obs],
-                             tx=optax.adam(learning_rate=self.actor_lr))
+                             tx=actor_optimizer)
 
         critic_def = critic_net.DoubleCritic(self.hidden_dims, use_bronet=self.use_bronet)
         critic = Model.create(critic_def,
                               inputs=[critic_key, self.dummy_obs, self.dummy_acts],
-                              tx=optax.adam(learning_rate=self.critic_lr))
+                              tx=critic_optimizer)
         target_critic = Model.create(
             critic_def, inputs=[critic_key, self.dummy_obs, self.dummy_acts])
 
         temp = Model.create(temperature.Temperature(self.init_temperature),
                             inputs=[temp_key],
-                            tx=optax.adam(learning_rate=self.temp_lr))
+                            tx=temp_optimizer)
 
         self.actor = actor
         self.critic = critic
