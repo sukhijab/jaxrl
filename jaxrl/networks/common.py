@@ -41,32 +41,38 @@ class MLP(nn.Module):
 class BroNetBlock(nn.Module):
     hidden_dim: int
     activations: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
-    use_layer_norm: bool = True
+    use_layer_norm_before: bool = True
+    use_layer_norm_after: bool = False
     dropout_rate: Optional[float] = None
 
     @nn.compact
     def __call__(self, x: jnp.ndarray, training: bool = False) -> jnp.ndarray:
         assert x.shape[-1] == self.hidden_dim
-        out = nn.Dense(self.hidden_dim, kernel_init=default_init())(x)
+        if self.use_layer_norm_before:
+            out = nn.LayerNorm()(x)
+        else:
+            out = x
+        out = nn.Dense(self.hidden_dim, kernel_init=default_init())(out)
         if self.dropout_rate is not None:
             out = nn.Dropout(rate=self.dropout_rate)(
                 out, deterministic=not training)
-        out = nn.LayerNorm()(out)
         out = self.activations(out)
         out = nn.Dense(self.hidden_dim, kernel_init=default_init())(out)
         if self.dropout_rate is not None:
             out = nn.Dropout(rate=self.dropout_rate)(
                 out, deterministic=not training)
-        out = nn.LayerNorm()(out)
+        if self.use_layer_norm_after:
+            out = nn.LayerNorm()(out)
         return out + x
 
 
 class BroNet(nn.Module):
     hidden_dims: Sequence[int]
     activations: Callable[[jnp.ndarray], jnp.ndarray] = nn.relu
-    activate_final: int = False
+    activate_final: bool = False
     dropout_rate: Optional[float] = None
-    use_layer_norm: bool = True
+    use_layer_norm_before: bool = True
+    use_layer_norm_after: bool = False
 
     @nn.compact
     def __call__(self, x: jnp.ndarray, training: bool = False) -> jnp.ndarray:
@@ -75,9 +81,6 @@ class BroNet(nn.Module):
             if i == 0 or i == len(self.hidden_dims) - 1:
                 x = nn.Dense(size, kernel_init=default_init())(x)
                 if i + 1 < len(self.hidden_dims) or self.activate_final:
-                    if i + 1 < len(self.hidden_dims):
-                        if self.use_layer_norm:
-                            x = nn.LayerNorm()(x)
                     x = self.activations(x)
                     if self.dropout_rate is not None:
                         x = nn.Dropout(rate=self.dropout_rate)(
@@ -85,7 +88,8 @@ class BroNet(nn.Module):
             else:
                 x = BroNetBlock(hidden_dim=size,
                                 activations=self.activations,
-                                use_layer_norm=self.use_layer_norm,
+                                use_layer_norm_before=self.use_layer_norm_before,
+                                use_layer_norm_after=self.use_layer_norm_after,
                                 dropout_rate=self.dropout_rate)(x, training=training)
         return x
 
