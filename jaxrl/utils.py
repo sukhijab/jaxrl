@@ -5,9 +5,26 @@ from gymnasium.wrappers.pixel_observation import PixelObservationWrapper
 from jaxrl import wrappers
 
 import os
+import cv2
 from typing import Optional, Callable
 
 from gymnasium.wrappers.monitoring import video_recorder
+
+
+class ResizeRenderWrapper(gym.Wrapper):
+    def __init__(self, env, width: int = 1024, height: Optional[int] = None):
+        super().__init__(env)
+        self.width = width
+        if height is not None:
+            self.height = height
+        else:
+            self.height = width
+
+    def render(self):
+        frame = self.env.render()
+        if frame is not None:
+            frame = cv2.resize(frame, (self.width, self.height), cv2.INTER_AREA)
+        return frame
 
 
 class RecordVideo(gym.wrappers.RecordVideo):
@@ -21,7 +38,6 @@ class RecordVideo(gym.wrappers.RecordVideo):
                  name_prefix: str = "rl-video",
                  disable_logger: bool = False,
                  image_size: int = 1024,
-                 from_pixels: bool = False,
                  ):
         super().__init__(env=env,
                          video_folder=video_folder,
@@ -32,7 +48,6 @@ class RecordVideo(gym.wrappers.RecordVideo):
                          disable_logger=disable_logger,
                          )
         self.image_size = image_size
-        self.from_pixels = from_pixels
 
     def start_video_recorder(self):
         self.close_video_recorder()
@@ -42,15 +57,8 @@ class RecordVideo(gym.wrappers.RecordVideo):
             video_name = f"{self.name_prefix}-episode-{self.episode_id}"
 
         base_path = os.path.join(self.video_folder, video_name)
-        if not self.from_pixels:
-            env = PixelObservationWrapper(self.env,
-                                          pixels_only=True)
-            env = wrappers.TakeKey(env, take_key='pixels')
-            env = gym.wrappers.ResizeObservation(env, self.image_size)
-        else:
-            env = gym.wrappers.ResizeObservation(self.env, self.image_size)
         self.video_recorder = video_recorder.VideoRecorder(
-            env=env,
+            env=ResizeRenderWrapper(self.env, width=self.image_size),
             base_path=base_path,
             metadata={"step_id": self.step_id, "episode_id": self.episode_id},
             disable_logger=self.disable_logger,
@@ -120,7 +128,7 @@ def make_env(env_name: str,
     env = RescaleAction(env, -1.0, 1.0)
 
     if save_folder is not None:
-        env = RecordVideo(env, save_folder, image_size=recording_image_size, from_pixels=from_pixels)
+        env = RecordVideo(env, save_folder, image_size=recording_image_size)
 
     if from_pixels:
         env = PixelObservationWrapper(env,
