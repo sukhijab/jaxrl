@@ -22,7 +22,7 @@ def make_env(env_name: str,
              gray_scale: bool = False,
              flatten: bool = True,
              recording_image_size: Optional[int] = None,
-             episode_trigger: Callable[[int], bool] = None,
+             episode_trigger: Optional[Callable[[int], bool]] = None,
              ) -> gym.Env:
     # Check if the env is in gym.
     all_envs = gym.envs.registry.values()
