@@ -26,10 +26,15 @@ def update(rng: PRNGKey, actor: Model, critic: Model, target_critic: Model,
     all_indx = jnp.arange(0, n)
     rng, key = jax.random.split(rng)
     indx = jax.random.choice(key, a=all_indx, shape=(m, ), replace=False)
-    params = jax.tree_util.tree_map(lambda param: param[indx],
-                                    target_critic.params)
-    next_qs = target_critic.apply_fn({'params': params},
-                                     batch.next_observations, next_actions)
+    # params = jax.tree_util.tree_map(lambda param: param[indx],
+    #                                target_critic.params)
+    # next_qs = target_critic.apply_fn({'params': params},
+    #                                 batch.next_observations, next_actions)
+    # evaluate for all params
+    next_qs = target_critic(batch.next_observations, next_actions)
+    # sample random indices
+    next_qs = jax.tree_util.tree_map(lambda x: x[indx],
+                                     next_qs)
     next_q = jnp.min(next_qs, axis=0)
 
     target_q = batch.rewards + discount * batch.masks * next_q
